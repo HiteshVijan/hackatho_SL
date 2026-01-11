@@ -102,6 +102,27 @@ const ACHIEVEMENTS = {
     description: 'Created 3 or more programs',
     icon: '📚',
     xp: 100
+  },
+  streak_3: {
+    id: 'streak_3',
+    name: 'Consistent Creator',
+    description: 'Maintained a 3-day streak',
+    icon: '🔥',
+    xp: 50
+  },
+  streak_7: {
+    id: 'streak_7',
+    name: 'Week Warrior',
+    description: 'Maintained a 7-day streak',
+    icon: '⭐',
+    xp: 100
+  },
+  early_bird: {
+    id: 'early_bird',
+    name: 'Early Adopter',
+    description: 'One of the first to use ProgramForge',
+    icon: '🌅',
+    xp: 25
   }
 }
 
@@ -165,6 +186,20 @@ const INITIAL_STAGES = [
   }
 ]
 
+// Mock leaderboard data
+const MOCK_LEADERBOARD = [
+  { id: '1', name: 'Priya Sharma', organization: 'EduReach Foundation', xp: 2450, level: 8, avatar: '👩‍🏫', programs: 12 },
+  { id: '2', name: 'Rahul Verma', organization: 'Learn4All NGO', xp: 2100, level: 7, avatar: '👨‍💼', programs: 9 },
+  { id: '3', name: 'Anita Desai', organization: 'Rural Education Trust', xp: 1850, level: 7, avatar: '👩‍💻', programs: 8 },
+  { id: '4', name: 'Vikram Singh', organization: 'Youth Uplift', xp: 1600, level: 6, avatar: '👨‍🎓', programs: 7 },
+  { id: '5', name: 'Meera Patel', organization: 'Bright Futures', xp: 1400, level: 6, avatar: '👩‍🔬', programs: 6 },
+  { id: '6', name: 'Arjun Kumar', organization: 'EduTech Solutions', xp: 1200, level: 5, avatar: '🧑‍🏫', programs: 5 },
+  { id: '7', name: 'Kavita Rao', organization: 'Child First India', xp: 1000, level: 5, avatar: '👩‍⚕️', programs: 5 },
+  { id: '8', name: 'Suresh Nair', organization: 'Skill Bridge', xp: 850, level: 4, avatar: '👨‍🔧', programs: 4 },
+  { id: '9', name: 'Deepa Menon', organization: 'Dream School Project', xp: 700, level: 4, avatar: '👩‍🎨', programs: 3 },
+  { id: '10', name: 'Amit Joshi', organization: 'Tech4Education', xp: 550, level: 3, avatar: '👨‍💻', programs: 3 },
+]
+
 const useStore = create(
   persist(
     (set, get) => ({
@@ -172,13 +207,29 @@ const useStore = create(
       user: {
         name: '',
         organization: '',
-        email: ''
+        email: '',
+        avatar: '🧑‍💼',
+        joinedAt: null
       },
       
       // Gamification state
       xp: 0,
       level: 1,
       achievements: [],
+      
+      // Streak tracking
+      streak: {
+        current: 0,
+        longest: 0,
+        lastActiveDate: null
+      },
+      
+      // Settings
+      settings: {
+        soundEnabled: true,
+        notificationsEnabled: true,
+        theme: 'dark'
+      },
       
       // Programs
       programs: [],
@@ -188,6 +239,7 @@ const useStore = create(
       showAchievementModal: false,
       latestAchievement: null,
       showConfetti: false,
+      hasCompletedOnboarding: false,
       
       // Stage timing for speed achievements
       stageStartTime: null,
@@ -217,8 +269,83 @@ const useStore = create(
         return Math.max(0, nextThreshold - xp)
       },
       
+      getLeaderboard: () => {
+        const { user, xp, level, programs } = get()
+        // Insert current user into leaderboard
+        const currentUser = {
+          id: 'current',
+          name: user.name || 'You',
+          organization: user.organization || 'Your Organization',
+          xp,
+          level,
+          avatar: user.avatar,
+          programs: programs.length,
+          isCurrentUser: true
+        }
+        
+        const combined = [...MOCK_LEADERBOARD, currentUser]
+        return combined.sort((a, b) => b.xp - a.xp).slice(0, 15)
+      },
+      
+      getUserRank: () => {
+        const leaderboard = get().getLeaderboard()
+        const rank = leaderboard.findIndex(u => u.isCurrentUser) + 1
+        return rank || leaderboard.length + 1
+      },
+      
       // Actions
       setUser: (userData) => set({ user: { ...get().user, ...userData } }),
+      
+      updateSettings: (newSettings) => set({ 
+        settings: { ...get().settings, ...newSettings } 
+      }),
+      
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      
+      // Streak management
+      updateStreak: () => {
+        const { streak } = get()
+        const today = new Date().toDateString()
+        const lastActive = streak.lastActiveDate
+        
+        if (lastActive === today) {
+          // Already active today
+          return streak.current
+        }
+        
+        const yesterday = new Date(Date.now() - 86400000).toDateString()
+        
+        if (lastActive === yesterday) {
+          // Continuing streak
+          const newStreak = streak.current + 1
+          const newLongest = Math.max(streak.longest, newStreak)
+          
+          set({
+            streak: {
+              current: newStreak,
+              longest: newLongest,
+              lastActiveDate: today
+            }
+          })
+          
+          // Check for streak achievements
+          if (newStreak === 3) get().unlockAchievement('streak_3')
+          if (newStreak === 7) get().unlockAchievement('streak_7')
+          
+          return newStreak
+        }
+        
+        // Streak broken or first day
+        set({
+          streak: {
+            current: 1,
+            longest: Math.max(streak.longest, 1),
+            lastActiveDate: today
+          }
+        })
+        
+        return 1
+      },
       
       addXp: (amount) => {
         const { xp, level } = get()
@@ -242,7 +369,7 @@ const useStore = create(
           setTimeout(() => set({ showConfetti: false }), 5000)
         }
         
-        return { leveledUp, newLevel }
+        return { leveledUp, newLevel, newLevelTitle: LEVEL_TITLES[newLevel - 1] }
       },
       
       unlockAchievement: (achievementId) => {
@@ -323,9 +450,13 @@ const useStore = create(
           currentProgramId: newProgram.id
         }))
         
+        // Update streak
+        get().updateStreak()
+        
         // First program achievement
         if (get().programs.length === 1) {
           get().unlockAchievement('first_step')
+          get().unlockAchievement('early_bird')
         }
         
         // Multi-program achievement
@@ -350,6 +481,9 @@ const useStore = create(
               : p
           )
         }))
+        
+        // Update streak on activity
+        get().updateStreak()
       },
       
       startStageTimer: () => set({ stageStartTime: Date.now() }),
@@ -372,7 +506,8 @@ const useStore = create(
         }))
         
         // XP for completing stage
-        get().addXp(25 + (stageNumber * 10))
+        const xpEarned = 25 + (stageNumber * 10)
+        const result = get().addXp(xpEarned)
         
         // Unlock stage achievement
         if (stage?.unlockAchievement) {
@@ -383,6 +518,11 @@ const useStore = create(
         if (stageStartTime && (Date.now() - stageStartTime) < 120000) {
           get().unlockAchievement('speed_runner')
         }
+        
+        // Update streak
+        get().updateStreak()
+        
+        return { xpEarned, ...result }
       },
       
       deleteProgram: (programId) => {
@@ -414,7 +554,9 @@ const useStore = create(
         level: 1,
         achievements: [],
         programs: [],
-        currentProgramId: null
+        currentProgramId: null,
+        streak: { current: 0, longest: 0, lastActiveDate: null },
+        hasCompletedOnboarding: false
       })
     }),
     {
@@ -425,7 +567,10 @@ const useStore = create(
         level: state.level,
         achievements: state.achievements,
         programs: state.programs,
-        currentProgramId: state.currentProgramId
+        currentProgramId: state.currentProgramId,
+        streak: state.streak,
+        settings: state.settings,
+        hasCompletedOnboarding: state.hasCompletedOnboarding
       })
     }
   )
@@ -433,4 +578,3 @@ const useStore = create(
 
 export default useStore
 export { ACHIEVEMENTS, INITIAL_STAGES, LEVEL_TITLES, LEVEL_THRESHOLDS }
-

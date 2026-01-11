@@ -3,15 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { 
   BarChart3, TrendingUp, Award, BookOpen, Zap, 
   Target, Users, Calendar, ArrowRight, Plus,
-  CheckCircle, Clock, Sparkles
+  CheckCircle, Clock, Sparkles, Flame
 } from 'lucide-react'
 import useStore, { ACHIEVEMENTS, INITIAL_STAGES, LEVEL_TITLES } from '../store/useStore'
+import Leaderboard from '../components/Leaderboard'
+import StreakCounter from '../components/StreakCounter'
+import { toast } from '../components/Toast'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { 
-    user, programs, xp, level, achievements, 
-    getLevelProgress, getLevelTitle, createProgram 
+    user, programs, xp, level, achievements, streak,
+    getLevelProgress, getLevelTitle, createProgram, getUserRank
   } = useStore()
   
   // Calculate analytics
@@ -20,6 +23,7 @@ export default function Dashboard() {
   const inProgressPrograms = programs.filter(p => p.completedStages.length > 0 && p.completedStages.length < 7).length
   const totalStagesCompleted = programs.reduce((acc, p) => acc + p.completedStages.length, 0)
   const achievementProgress = Math.round((achievements.length / Object.keys(ACHIEVEMENTS).length) * 100)
+  const userRank = getUserRank()
   
   // Recent activity (last 5 updated programs)
   const recentPrograms = [...programs]
@@ -34,6 +38,7 @@ export default function Dashboard() {
   
   const handleNewProgram = () => {
     createProgram('New Program')
+    toast.success('New program created!')
     navigate('/quest')
   }
   
@@ -56,7 +61,7 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Header */}
       <motion.div
-        className="flex items-center justify-between mb-8"
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
@@ -76,20 +81,32 @@ export default function Dashboard() {
           </p>
         </div>
         
-        <motion.button
-          className="btn-primary flex items-center gap-2"
-          onClick={handleNewProgram}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Plus size={20} />
-          New Program
-        </motion.button>
+        <div className="flex items-center gap-3">
+          {/* Rank Badge */}
+          <motion.div
+            className="flex items-center gap-2 px-4 py-2 bg-[rgba(168,85,247,0.15)] border border-[rgba(168,85,247,0.3)] rounded-xl cursor-pointer"
+            onClick={() => navigate('/leaderboard')}
+            whileHover={{ scale: 1.05 }}
+          >
+            <Users size={18} className="text-[#a855f7]" />
+            <span className="text-[#a855f7] font-bold">#{userRank}</span>
+          </motion.div>
+
+          <motion.button
+            className="btn-primary flex items-center gap-2"
+            onClick={handleNewProgram}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Plus size={20} />
+            New Program
+          </motion.button>
+        </div>
       </motion.div>
       
       {/* Stats Grid */}
       <motion.div
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+        className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -123,32 +140,39 @@ export default function Dashboard() {
             color: '#f472b6',
             subtitle: `${achievementProgress}% unlocked`
           },
+          { 
+            label: 'Streak', 
+            value: streak.current, 
+            icon: Flame, 
+            color: '#ff6b35',
+            subtitle: `Best: ${streak.longest} days`
+          },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
-            className="quest-card p-5"
+            className="quest-card p-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + index * 0.05 }}
             whileHover={{ y: -2 }}
           >
-            <div className="flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-2">
               <div 
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                className="w-9 h-9 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: `${stat.color}20` }}
               >
-                <stat.icon size={20} style={{ color: stat.color }} />
+                <stat.icon size={18} style={{ color: stat.color }} />
               </div>
-              <TrendingUp size={16} className="text-[#4ade80]" />
+              <TrendingUp size={14} className="text-[#4ade80]" />
             </div>
             <div 
-              className="text-2xl font-bold text-[#f4f1de] mb-1"
+              className="text-2xl font-bold text-[#f4f1de] mb-0.5"
               style={{ fontFamily: 'Cinzel, serif' }}
             >
               {stat.value}
             </div>
-            <div className="text-sm text-[#a8a29e]">{stat.label}</div>
-            <div className="text-xs text-[#6b7280] mt-1">{stat.subtitle}</div>
+            <div className="text-xs text-[#a8a29e]">{stat.label}</div>
+            <div className="text-[10px] text-[#6b7280] mt-0.5">{stat.subtitle}</div>
           </motion.div>
         ))}
       </motion.div>
@@ -168,14 +192,14 @@ export default function Dashboard() {
           
           <div className="text-center mb-6">
             <motion.div
-              className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8942e] flex items-center justify-center text-4xl font-bold text-[#0a1628] mb-3"
+              className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-[#d4af37] to-[#b8942e] flex items-center justify-center text-3xl font-bold text-[#0a1628] mb-3"
               animate={{ rotate: [0, 5, -5, 0] }}
               transition={{ duration: 4, repeat: Infinity }}
               style={{ fontFamily: 'Cinzel, serif' }}
             >
               {level}
             </motion.div>
-            <h4 className="text-xl font-bold text-[#f4f1de]" style={{ fontFamily: 'Cinzel, serif' }}>
+            <h4 className="text-lg font-bold text-[#f4f1de]" style={{ fontFamily: 'Cinzel, serif' }}>
               {getLevelTitle()}
             </h4>
           </div>
@@ -236,7 +260,7 @@ export default function Dashboard() {
               </motion.button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {stageDistribution.map((stage, index) => (
                 <motion.div
                   key={stage.id}
@@ -250,7 +274,7 @@ export default function Dashboard() {
                       <span className="text-sm text-[#f4f1de]">{stage.name}</span>
                     </div>
                     <span className="text-sm text-[#a8a29e]">
-                      {stage.count}/{totalPrograms} programs ({stage.percentage}%)
+                      {stage.count}/{totalPrograms} ({stage.percentage}%)
                     </span>
                   </div>
                   <div className="h-2 bg-[#1a2744] rounded-full overflow-hidden">
@@ -271,89 +295,112 @@ export default function Dashboard() {
         </motion.div>
       </div>
       
-      {/* Recent Activity */}
-      <motion.div
-        className="mt-6 quest-card p-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#f4f1de] flex items-center gap-2">
-            <Clock size={18} className="text-[#d4af37]" />
-            Recent Activity
-          </h3>
-          <button 
-            onClick={() => navigate('/programs')}
-            className="text-sm text-[#d4af37] hover:text-[#f0d77a] flex items-center gap-1"
-          >
-            View All <ArrowRight size={14} />
-          </button>
-        </div>
-        
-        {recentPrograms.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-3">🚀</div>
-            <p className="text-[#a8a29e] mb-4">No programs yet. Start your first quest!</p>
-            <motion.button
-              className="btn-primary"
-              onClick={handleNewProgram}
-              whileHover={{ scale: 1.05 }}
+      {/* Second Row: Recent Activity + Leaderboard */}
+      <div className="mt-6 grid md:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <motion.div
+          className="quest-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-[#f4f1de] flex items-center gap-2">
+              <Clock size={18} className="text-[#d4af37]" />
+              Recent Activity
+            </h3>
+            <button 
+              onClick={() => navigate('/programs')}
+              className="text-sm text-[#d4af37] hover:text-[#f0d77a] flex items-center gap-1"
             >
-              Create Program
-            </motion.button>
+              View All <ArrowRight size={14} />
+            </button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {recentPrograms.map((program, index) => {
-              const progress = Math.round((program.completedStages.length / 7) * 100)
-              const currentStage = INITIAL_STAGES.find(s => s.id === program.currentStage)
-              
-              return (
-                <motion.div
-                  key={program.id}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-[rgba(26,39,68,0.5)] hover:bg-[rgba(26,39,68,0.8)] cursor-pointer transition-all"
-                  onClick={() => {
-                    useStore.getState().selectProgram(program.id)
-                    navigate('/quest')
-                  }}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + index * 0.05 }}
-                  whileHover={{ x: 5 }}
-                >
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#d4af37] to-[#b8942e] flex items-center justify-center text-lg">
-                    {progress === 100 ? '🏆' : currentStage?.icon || '📜'}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[#f4f1de] font-medium truncate">
-                      {program.data.programName || program.name}
-                    </h4>
-                    <p className="text-xs text-[#6b7280]">
-                      {progress === 100 ? 'Completed' : `Stage ${program.currentStage}: ${currentStage?.name}`}
-                    </p>
-                  </div>
-                  
-                  <div className="text-right">
-                    <div className="text-sm text-[#d4af37] font-medium">{progress}%</div>
-                    <div className="text-xs text-[#6b7280]">{formatDate(program.updatedAt)}</div>
-                  </div>
-                  
-                  <ArrowRight size={16} className="text-[#6b7280]" />
-                </motion.div>
-              )
-            })}
+          
+          {recentPrograms.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">🚀</div>
+              <p className="text-[#a8a29e] mb-4">No programs yet. Start your first quest!</p>
+              <motion.button
+                className="btn-primary"
+                onClick={handleNewProgram}
+                whileHover={{ scale: 1.05 }}
+              >
+                Create Program
+              </motion.button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentPrograms.map((program, index) => {
+                const progress = Math.round((program.completedStages.length / 7) * 100)
+                const currentStage = INITIAL_STAGES.find(s => s.id === program.currentStage)
+                
+                return (
+                  <motion.div
+                    key={program.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-[rgba(26,39,68,0.5)] hover:bg-[rgba(26,39,68,0.8)] cursor-pointer transition-all"
+                    onClick={() => {
+                      useStore.getState().selectProgram(program.id)
+                      navigate('/quest')
+                    }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + index * 0.05 }}
+                    whileHover={{ x: 5 }}
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#d4af37] to-[#b8942e] flex items-center justify-center text-lg flex-shrink-0">
+                      {progress === 100 ? '🏆' : currentStage?.icon || '📜'}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-[#f4f1de] font-medium truncate text-sm">
+                        {program.data.programName || program.name}
+                      </h4>
+                      <p className="text-[10px] text-[#6b7280]">
+                        {progress === 100 ? 'Completed' : `${currentStage?.name}`}
+                      </p>
+                    </div>
+                    
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm text-[#d4af37] font-medium">{progress}%</div>
+                      <div className="text-[10px] text-[#6b7280]">{formatDate(program.updatedAt)}</div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Mini Leaderboard */}
+        <motion.div
+          className="quest-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-[#f4f1de] flex items-center gap-2">
+              <Users size={18} className="text-[#d4af37]" />
+              Top Designers
+            </h3>
+            <button 
+              onClick={() => navigate('/leaderboard')}
+              className="text-sm text-[#d4af37] hover:text-[#f0d77a] flex items-center gap-1"
+            >
+              Full Board <ArrowRight size={14} />
+            </button>
           </div>
-        )}
-      </motion.div>
+          <Leaderboard compact />
+        </motion.div>
+      </div>
       
       {/* Quick Actions */}
       <motion.div
         className="mt-6 grid md:grid-cols-3 gap-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.6 }}
       >
         {[
           { 
@@ -402,4 +449,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
